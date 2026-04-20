@@ -36,6 +36,7 @@ class GeminiClient:
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
+        self.genai = genai  # save so complete() can access it
         self.model = genai.GenerativeModel(model_name)
         self.temperature = float(temperature)
 
@@ -43,23 +44,30 @@ class GeminiClient:
         """
         Sends a single request to Gemini.
 
-        UPDATED: Added try/except to handle rate limits and API errors gracefully.
-        If an error occurs, it returns an empty string, triggering the agent's 
-        heuristic fallback logic.
+        UPDATED: Moved system_prompt to system_instruction parameter
+        because Gemini does not support role: "system" in generate_content.
+        If an error occurs, returns empty string to trigger heuristic fallback.
         """
         try:
-            response = self.model.generate_content(
-                [
-                    {"role": "system", "parts": [system_prompt]},
-                    {"role": "user", "parts": [user_prompt]},
-                ],
+            # Create a new model instance with the system prompt passed
+            # as system_instruction — this is the correct way to send
+            # a system prompt to the Gemini API.
+            model = self.genai.GenerativeModel(
+                self.model.model_name,
+                system_instruction=system_prompt
+            )
+            
+            # Send only the user prompt as the message content
+            response = model.generate_content(
+                user_prompt,
                 generation_config={"temperature": self.temperature},
             )
 
-            # Defensive: response.text can be None or raise an error if blocked by filters.
+            # Defensive check: response.text can be None if the response
+            # was blocked by safety filters or returned empty
             return response.text or ""
-            
+
         except Exception as e:
-            # Returning empty string allows the agent to detect the failure 
-            # and switch to offline rules.
+            # Returning empty string allows the agent to detect the failure
+            # and switch to heuristic fallback logic
             return ""
