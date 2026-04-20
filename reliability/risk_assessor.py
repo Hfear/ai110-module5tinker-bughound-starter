@@ -62,6 +62,12 @@ def assess_risk(
         score -= 5
         reasons.append("Bare except was modified, verify correctness.")
 
+    # Check if a return value type may have changed (e.g. 0 -> None)
+    # This can silently break calling code and requires human review.
+    if "return 0" in original_code and "return None" in fixed_code:
+        score -= 20
+        reasons.append("Return value type may have changed (e.g. 0 to None). Verify calling code.")
+
     # ----------------------------
     # Clamp score
     # ----------------------------
