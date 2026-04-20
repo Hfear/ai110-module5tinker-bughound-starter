@@ -46,3 +46,14 @@ def test_missing_return_is_penalized():
     )
     assert risk["score"] < 100
     assert any("Return" in r or "return" in r for r in risk["reasons"])
+
+def test_return_type_change_is_penalized():
+    original = "def compute(x, y):\n    try:\n        return x / y\n    except:\n        return 0\n"
+    fixed = "def compute(x, y):\n    try:\n        return x / y\n    except ZeroDivisionError:\n        return None\n"
+    risk = assess_risk(
+        original_code=original,
+        fixed_code=fixed,
+        issues=[{"type": "Reliability", "severity": "High", "msg": "bare except"}],
+    )
+    assert any("Return value type" in r for r in risk["reasons"])
+    assert risk["should_autofix"] is False
